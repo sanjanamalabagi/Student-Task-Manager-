@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Task Manager</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f0f4ff;
+  padding: 15px;
+}
+.container {
+  max-width: 520px;
+  margin: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px #ccd3e0;
+}
+h1 { color: #5145cd; text-align: center; }
+input, select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px;
+  margin: 7px 0;
+  border: 1px solid #ccc;
+  border-radius: 7px;
+  font-size: 16px;
+}
+button {
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 4px;
+}
+.add { background: #5145cd; color: white; width: 100%; }
+.delete { background: #ffe5e5; color: #b42318; }
+li {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f7f7ff;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.done { text-decoration: line-through; color: gray; }
+.small { color: #666; font-size: 13px; margin-top: 5px; }
+.stats {
+  background: #eeecff;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.overdue { color: #b42318; font-weight: bold; }
+.filters {
+  display: flex;
+  gap: 5px;
+  margin: 10px 0;
+}
+.filters button { flex: 1; background: #e8e8f5; }
+.filters button.active { background: #5145cd; color: white; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📚 Student Task Manager</h1>
+  <p>Plan your studies and meet your deadlines!</p>
+
+  <div class="stats" id="stats"></div>
+
+  <h3>Add a new task</h3>
+  <input id="taskInput" type="text" placeholder="Task name">
+  <select id="subject">
+    <option value="">Choose subject</option>
+    <option>DBMS</option>
+    <option>Java</option>
+    <option>Software Engineering</option>
+    <option>Operating Systems</option>
+    <option>Other</option>
+  </select>
+  <label for="dueDate">Due date:</label>
+  <input id="dueDate" type="date">
+  <button class="add" onclick="addTask()">Add Task</button>
+
+  <h3>📝 My Tasks</h3>
+  <div class="filters">
+    <button class="active" onclick="setFilter('all', this)">All</button>
+    <button onclick="setFilter('pending', this)">Pending</button>
+    <button onclick="setFilter('completed', this)">Completed</button>
+  </div>
+  <ul id="taskList"></ul>
+  <p id="emptyMessage" class="small"></p>
+</div>
+
+<script>
+let tasks = JSON.parse(localStorage.getItem("studentTasks") || "[]");
+let currentFilter = "all";
+
+function saveTasks() {
+  localStorage.setItem("studentTasks", JSON.stringify(tasks));
+}
+
+function setFilter(filter, button) {
+  currentFilter = filter;
+  document.querySelectorAll(".filters button").forEach(function(btn) {
+    btn.classList.remove("active");
+  });
+  button.classList.add("active");
+  showTasks();
+}
+
+function showTasks() {
+  const list = document.getElementById("taskList");
+  list.innerHTML = "";
+
+  const visibleTasks = tasks.map((task, index) => ({task, index}))
+    .filter(({task}) => {
+      if (currentFilter === "pending") return !task.done;
+      if (currentFilter === "completed") return task.done;
+      return true;
+    });
+
+  visibleTasks.forEach(function(entry) {
+    const task = entry.task;
+    const index = entry.index;
+    const item = document.createElement("li");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = task.done;
+    checkbox.style.width = "auto";
+    checkbox.onchange = function() {
+      tasks[index].done = checkbox.checked;
+      saveTasks();
+      showTasks();
+    };
+
+    const name = document.createElement("span");
+    name.textContent = " " + task.text;
+    if (task.done) name.className = "done";
+
+    const details = document.createElement("div");
+    details.className = "small";
+    details.textContent = (task.subject || "No subject") +
+      (task.dueDate ? " • Due: " + task.dueDate : "");
+
+    item.append(checkbox, name, details);
+
+    if (task.dueDate && task.dueDate < getToday() && !task.done) {
+      const warning = document.createElement("div");
+      warning.className = "small overdue";
+      warning.textContent = "⚠ Overdue!";
+      item.appendChild(warning);
+    }
+
+    const del = document.createElement("button");
+    del.textContent = "Delete";
+    del.className = "delete";
+    del.onclick = function() {
+      tasks.splice(index, 1);
+      saveTasks();
+      showTasks();
+    };
+    item.appendChild(del);
+    list.appendChild(item);
+  });
+
+  const completed = tasks.filter(t => t.done).length;
+  document.getElementById("stats").textContent =
+    "Total: " + tasks.length +
+    " | Completed: " + completed +
+    " | Pending: " + (tasks.length - completed);
+
+  document.getElementById("emptyMessage").textContent =
+    visibleTasks.length ? "" : "No tasks in this category yet.";
+}
+
+function getToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function addTask() {
+  const input = document.getElementById("taskInput");
+  const text = input.value.trim();
+  const subject = document.getElementById("subject").value;
+  const dueDate = document.getElementById("dueDate").value;
+
+  if (!text) {
+    alert("Please enter a task name!");
+    return;
+  }
+
+  tasks.push({text, subject, dueDate, done: false});
+  saveTasks();
+  input.value = "";
+  document.getElementById("subject").value = "";
+  document.getElementById("dueDate").value = "";
+  showTasks();
+}
+
+showTasks();
+</script>
+</body>
+</html>
